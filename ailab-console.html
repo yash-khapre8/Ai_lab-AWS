@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AILab — Operations Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14161A;
+    --panel: #1B1E24;
+    --panel-raised: #21252C;
+    --line: rgba(237,234,227,0.08);
+    --line-strong: rgba(237,234,227,0.16);
+    --ink: #EDEAE3;
+    --ink-dim: #9A9890;
+    --ink-faint: #66645E;
+    --amber: #FF8A3D;
+    --amber-dim: rgba(255,138,61,0.14);
+    --signal: #5B8DEF;
+    --signal-dim: rgba(91,141,239,0.14);
+    --good: #7FD99A;
+    --warn: #FFC65C;
+    --bad: #FF6B5E;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 13px; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: var(--mono); }
+
+  /* ============ LOGIN ============ */
+  .login-wrap { min-height: 100vh; display: none; align-items: center; justify-content: center; background: var(--bg); position: relative; overflow: hidden; }
+  .login-wrap.show { display: flex; }
+  .login-wrap::before {
+    content: ''; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 48px 48px;
+    opacity: 0.4;
+    mask-image: radial-gradient(circle at 50% 40%, black 0%, transparent 70%);
+  }
+  .login-card { position: relative; width: 400px; z-index: 1; }
+  .login-mark { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 28px; text-align: center; }
+  .login-mark span { color: var(--amber); }
+  .login-title { font-family: var(--mono); font-size: 32px; font-weight: 600; text-align: center; letter-spacing: -0.02em; margin-bottom: 6px; }
+  .login-sub { font-size: 13px; color: var(--ink-dim); text-align: center; margin-bottom: 36px; }
+  .login-panel { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 4px; padding: 28px; }
+  .field { margin-bottom: 16px; }
+  .field-label { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 8px; display: block; }
+  .field input, .field select {
+    width: 100%; background: var(--bg); border: 1px solid var(--line-strong);
+    border-radius: 3px; padding: 10px 12px; color: var(--ink); font-size: 13px;
+    font-family: var(--mono); outline: none; transition: border-color 0.15s;
+  }
+  .field input:focus, .field select:focus { border-color: var(--amber); }
+  .btn-go {
+    width: 100%; background: var(--amber); color: #1A1106; border: none;
+    border-radius: 3px; padding: 12px; font-size: 13px; font-weight: 600;
+    font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.1em;
+    cursor: pointer; transition: opacity 0.15s; margin-top: 4px;
+  }
+  .btn-go:hover { opacity: 0.85; }
+  .login-divider { display: flex; align-items: center; gap: 10px; margin: 22px 0 14px; }
+  .login-divider::before, .login-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+  .login-divider span { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.12em; }
+  .demo-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 12px; border: 1px solid var(--line); border-radius: 3px;
+    cursor: pointer; margin-bottom: 6px; transition: border-color 0.15s;
+  }
+  .demo-row:hover { border-color: var(--line-strong); }
+  .demo-role { font-family: var(--mono); font-size: 11px; color: var(--ink); }
+  .demo-key { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); border: 1px solid var(--line-strong); border-radius: 3px; padding: 2px 6px; }
+
+  /* ============ SHELL ============ */
+  .shell { display: none; min-height: 100vh; }
+  .shell.show { display: flex; }
+
+  .rail {
+    width: 232px; background: var(--panel); border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; flex-shrink: 0;
+  }
+  .rail-head { padding: 18px 18px 16px; border-bottom: 1px solid var(--line); }
+  .rail-id { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 4px; }
+  .rail-id span { color: var(--amber); }
+  .rail-name { font-family: var(--mono); font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+
+  .rail-nav { flex: 1; padding: 10px 0; overflow-y: auto; }
+  .nav-group-label { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.14em; padding: 14px 18px 6px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 11px; padding: 8px 18px;
+    cursor: pointer; color: var(--ink-dim); font-size: 13px;
+    border-left: 2px solid transparent; position: relative; transition: all 0.12s;
+  }
+  .nav-item:hover { color: var(--ink); background: rgba(255,255,255,0.02); }
+  .nav-item.active { color: var(--ink); border-left-color: var(--amber); background: var(--amber-dim); }
+  .nav-item .glyph { font-family: var(--mono); font-size: 11px; width: 16px; text-align: center; opacity: 0.6; flex-shrink: 0; }
+  .nav-item.active .glyph { opacity: 1; color: var(--amber); }
+  .nav-item .nkey { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--ink-faint); opacity: 0; }
+  .nav-item:hover .nkey { opacity: 1; }
+
+  .rail-foot { padding: 14px 18px; border-top: 1px solid var(--line); }
+  .who-row { display: flex; align-items: center; gap: 10px; }
+  .who-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex-shrink: 0; box-shadow: 0 0 0 3px rgba(127,217,154,0.15); }
+  .who-info { flex: 1; min-width: 0; }
+  .who-email { font-family: var(--mono); font-size: 11px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .who-role { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.1em; }
+  .signout { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); background: none; border: 1px solid var(--line-strong); border-radius: 3px; padding: 4px 8px; cursor: pointer; transition: color 0.15s; }
+  .signout:hover { color: var(--bad); border-color: var(--bad); }
+
+  /* MAIN */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+  .pulsebar {
+    height: 44px; border-bottom: 1px solid var(--line); display: flex;
+    align-items: center; padding: 0 22px; gap: 18px; background: var(--panel);
+    flex-shrink: 0;
+  }
+  .pulse-title { font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap; }
+  .pulse-wave { flex: 1; height: 24px; overflow: hidden; position: relative; }
+  .pulse-wave svg { display: block; }
+  .pulse-readout { display: flex; gap: 16px; align-items: center; }
+  .readout { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); white-space: nowrap; }
+  .readout b { color: var(--ink); font-weight: 500; }
+  .readout.live b { color: var(--good); }
+  .clock-readout { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); border: 1px solid var(--line); border-radius: 3px; padding: 4px 9px; white-space: nowrap; }
+
+  .content { flex: 1; padding: 26px 28px; overflow-y: auto; }
+
+  .page-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 22px; flex-wrap: wrap; gap: 10px; }
+  .page-eyebrow { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.16em; margin-bottom: 6px; }
+  .page-title { font-family: var(--mono); font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .page-meta { font-size: 12px; color: var(--ink-dim); }
+
+  /* STAT GRID */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1px; margin-bottom: 24px; background: var(--line); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .stat-cell { background: var(--panel); padding: 16px 18px; }
+  .stat-label { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 10px; }
+  .stat-value { font-family: var(--mono); font-size: 26px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
+  .stat-value.amber { color: var(--amber); }
+  .stat-value.signal { color: var(--signal); }
+  .stat-value.good { color: var(--good); }
+  .stat-value.bad { color: var(--bad); }
+  .stat-foot { font-size: 11px; color: var(--ink-faint); margin-top: 8px; }
+  .stat-foot.up { color: var(--good); }
+  .stat-foot.down { color: var(--bad); }
+
+  /* PANEL */
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; margin-bottom: 20px; overflow: hidden; }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; padding: 13px 18px; border-bottom: 1px solid var(--line); }
+  .panel-title { font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+  .panel-title .dim { color: var(--ink-faint); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 8px; }
+  .panel-action { font-family: var(--mono); font-size: 11px; color: var(--signal); cursor: pointer; text-transform: uppercase; letter-spacing: 0.06em; }
+  .panel-action:hover { text-decoration: underline; }
+  .panel-body { padding: 16px 18px; }
+
+  /* TABLE */
+  table.console-table { width: 100%; border-collapse: collapse; }
+  table.console-table th {
+    text-align: left; font-family: var(--mono); font-size: 10px; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.1em; padding: 10px 18px; border-bottom: 1px solid var(--line);
+    font-weight: 500;
+  }
+  table.console-table td { padding: 11px 18px; font-size: 12px; border-bottom: 1px solid var(--line); }
+  table.console-table tbody tr:last-child td { border-bottom: none; }
+  table.console-table tbody tr:hover td { background: rgba(255,255,255,0.02); }
+  .cell-mono { font-family: var(--mono); font-size: 11px; }
+  .cell-amber { color: var(--amber); }
+  .cell-signal { color: var(--signal); }
+
+  /* TAG */
+  .tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; padding: 3px 8px; border-radius: 2px; text-transform: uppercase; letter-spacing: 0.08em; border: 1px solid; }
+  .tag::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .tag-run { color: var(--good); border-color: rgba(127,217,154,0.3); background: rgba(127,217,154,0.08); }
+  .tag-pend { color: var(--warn); border-color: rgba(255,198,92,0.3); background: rgba(255,198,92,0.08); }
+  .tag-stop { color: var(--bad); border-color: rgba(255,107,94,0.3); background: rgba(255,107,94,0.08); }
+  .tag-done { color: var(--signal); border-color: rgba(91,141,239,0.3); background: rgba(91,141,239,0.08); }
+
+  /* BAR */
+  .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .bar-row:last-child { margin-bottom: 0; }
+  .bar-label { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); width: 90px; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.06em; }
+  .bar-track { flex: 1; height: 5px; background: var(--bg); border-radius: 0; overflow: hidden; position: relative; }
+  .bar-fill { height: 100%; transition: width 0.6s ease; }
+  .bar-val { font-family: var(--mono); font-size: 12px; color: var(--ink); width: 42px; text-align: right; flex-shrink: 0; }
+
+  /* LOG */
+  .logline { font-family: var(--mono); font-size: 11px; padding: 7px 0; border-bottom: 1px solid var(--line); display: flex; gap: 14px; align-items: baseline; }
+  .logline:last-child { border-bottom: none; }
+  .logtime { color: var(--ink-faint); flex-shrink: 0; min-width: 64px; }
+  .loglvl { flex-shrink: 0; min-width: 44px; font-weight: 600; }
+  .loglvl-INFO { color: var(--good); }
+  .loglvl-WARN { color: var(--warn); }
+  .loglvl-ERR { color: var(--bad); }
+  .logmsg { color: var(--ink-dim); }
+  .logmsg .hl { color: var(--ink); }
+
+  /* GRID 2 COL */
+  .g2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; }
+  .g2-rev { display: grid; grid-template-columns: 1fr 1.3fr; gap: 20px; }
+
+  /* CODE BLOCK */
+  .codeblock { font-family: var(--mono); font-size: 11px; line-height: 1.8; color: var(--ink-dim); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 14px 16px; overflow-x: auto; white-space: pre; }
+  .codeblock .kw { color: var(--signal); }
+  .codeblock .str { color: var(--good); }
+  .codeblock .cm { color: var(--ink-faint); }
+
+  /* FORM CONTROLS */
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .btn-console {
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 8px 16px; border-radius: 3px; cursor: pointer; transition: opacity 0.15s; border: 1px solid;
+  }
+  .btn-console:hover { opacity: 0.85; }
+  .btn-amber { background: var(--amber); color: #1A1106; border-color: var(--amber); }
+  .btn-ghost { background: transparent; color: var(--ink); border-color: var(--line-strong); }
+
+  .notice { display: flex; gap: 12px; padding: 12px 16px; border-radius: 3px; margin-bottom: 12px; font-size: 12px; align-items: flex-start; border: 1px solid; line-height: 1.6; }
+  .notice-ok { color: var(--good); border-color: rgba(127,217,154,0.25); background: rgba(127,217,154,0.06); }
+  .notice-warn { color: var(--warn); border-color: rgba(255,198,92,0.25); background: rgba(255,198,92,0.06); }
+  .notice-bad { color: var(--bad); border-color: rgba(255,107,94,0.25); background: rgba(255,107,94,0.06); }
+  .notice b { font-family: var(--mono); }
+
+  /* SCHEMA DIAGRAM */
+  .schema-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .schema-table { border: 1px solid var(--line-strong); border-radius: 3px; overflow: hidden; }
+  .schema-name { font-family: var(--mono); font-size: 11px; font-weight: 600; padding: 8px 12px; background: var(--panel-raised); border-bottom: 1px solid var(--line); color: var(--amber); }
+  .schema-field { font-family: var(--mono); font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; color: var(--ink-dim); }
+  .schema-field:last-child { border-bottom: none; }
+  .schema-field .pk { color: var(--signal); }
+  .schema-field .ftype { color: var(--ink-faint); }
+
+  @media(max-width: 980px) {
+    .g2, .g2-rev, .schema-grid { grid-template-columns: 1fr; }
+    .rail { width: 0; overflow: hidden; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div class="login-wrap show" id="login-wrap">
+  <div class="login-card">
+    <div class="login-mark">AILab <span>/</span> ML Operations Cloud <span>/</span> ap-south-1</div>
+    <div class="login-title">console.ailab</div>
+    <div class="login-sub">Authenticate to access the operations console</div>
+    <div class="login-panel">
+      <div class="field">
+        <label class="field-label">Identity</label>
+        <input type="email" id="login-email" value="admin@ailab.io">
+      </div>
+      <div class="field">
+        <label class="field-label">Credential</label>
+        <input type="password" id="login-pass" value="••••••••••••">
+      </div>
+      <div class="field">
+        <label class="field-label">Access role</label>
+        <select id="login-role">
+          <option value="admin">admin — full access</option>
+          <option value="manager">manager — read + reports</option>
+          <option value="researcher">researcher — ml jobs</option>
+        </select>
+      </div>
+      <button class="btn-go" onclick="doLogin()">Connect →</button>
+      <div class="login-divider"><span>Demo identities</span></div>
+      <div class="demo-row" onclick="setDemo('admin@ailab.io','admin')">
+        <span class="demo-role">admin@ailab.io</span>
+        <span class="demo-key">ADMIN</span>
+      </div>
+      <div class="demo-row" onclick="setDemo('manager@ailab.io','manager')">
+        <span class="demo-role">manager@ailab.io</span>
+        <span class="demo-key">MANAGER</span>
+      </div>
+      <div class="demo-row" onclick="setDemo('researcher@ailab.io','researcher')">
+        <span class="demo-role">researcher@ailab.io</span>
+        <span class="demo-key">RESEARCHER</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHELL ============ -->
+<div class="shell" id="shell">
+  <aside class="rail">
+    <div class="rail-head">
+      <div class="rail-id">AILab <span>/</span> ops</div>
+      <div class="rail-name">console.ailab</div>
+    </div>
+    <nav class="rail-nav" id="rail-nav"></nav>
+    <div class="rail-foot">
+      <div class="who-row">
+        <div class="who-dot"></div>
+        <div class="who-info">
+          <div class="who-email" id="who-email">—</div>
+          <div class="who-role" id="who-role">—</div>
+        </div>
+        <button class="signout" onclick="doLogout()">EXIT</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="pulsebar">
+      <div class="pulse-title" id="pulse-title">overview</div>
+      <div class="pulse-wave"><svg id="pulse-svg" width="100%" height="24" preserveAspectRatio="none"></svg></div>
+      <div class="pulse-readout">
+        <span class="readout live"><b>●</b> ap-south-1</span>
+        <span class="readout">cpu <b id="rb-cpu">—</b></span>
+        <span class="readout">mem <b id="rb-mem">—</b></span>
+        <div class="clock-readout" id="clock">--:--:--</div>
+      </div>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<script>
+const NAV = {
+  admin: [
+    { group: 'monitor', items: [
+      { id:'overview', label:'overview', key:'1' },
+      { id:'telemetry', label:'telemetry', key:'2' },
+    ]},
+    { group: 'infrastructure', items: [
+      { id:'compute', label:'compute', key:'3' },
+      { id:'database', label:'database', key:'4' },
+      { id:'containers', label:'containers', key:'5' },
+    ]},
+    { group: 'security', items: [
+      { id:'access', label:'access control', key:'6' },
+      { id:'audit', label:'audit trail', key:'7' },
+    ]},
+    { group: 'operations', items: [
+      { id:'jobs', label:'ml jobs', key:'8' },
+      { id:'reports', label:'reports', key:'9' },
+      { id:'cost', label:'cost', key:'0' },
+    ]},
+  ],
+  manager: [
+    { group: 'monitor', items: [
+      { id:'overview', label:'overview', key:'1' },
+      { id:'telemetry', label:'telemetry', key:'2' },
+    ]},
+    { group: 'operations', items: [
+      { id:'jobs', label:'ml jobs', key:'8' },
+      { id:'reports', label:'reports', key:'9' },
+      { id:'cost', label:'cost', key:'0' },
+    ]},
+  ],
+  researcher: [
+    { group: 'operations', items: [
+      { id:'jobs', label:'ml jobs', key:'8' },
+      { id:'overview', label:'overview', key:'1' },
+    ]},
+    { group: 'infrastructure', items: [
+      { id:'database', label:'data access', key:'4' },
+    ]},
+  ]
+};
+
+const TITLES = {
+  overview:'overview', telemetry:'telemetry', compute:'compute / ec2',
+  database:'database / rds', containers:'containers / ecs',
+  access:'access control / iam', audit:'audit trail / cloudtrail',
+  jobs:'ml jobs / ecs', reports:'reports', cost:'cost'
+};
+
+let user = null;
+let currentPage = 'overview';
+let metrics = { cpu:42, mem:67, disk:34, net:28 };
+
+function setDemo(email, role) {
+  document.getElementById('login-email').value = email;
+  document.getElementById('login-role').value = role;
+}
+
+function doLogin() {
+  const role = document.getElementById('login-role').value;
+  const email = document.getElementById('login-email').value || role+'@ailab.io';
+  user = { email, role };
+  document.getElementById('login-wrap').classList.remove('show');
+  document.getElementById('shell').classList.add('show');
+  document.getElementById('who-email').textContent = email;
+  document.getElementById('who-role').textContent = role;
+  buildNav();
+  navigate('overview');
+  startClock();
+  startMetrics();
+  startPulse();
+}
+
+function doLogout() {
+  user = null;
+  document.getElementById('shell').classList.remove('show');
+  document.getElementById('login-wrap').classList.add('show');
+}
+
+function buildNav() {
+  const nav = document.getElementById('rail-nav');
+  nav.innerHTML = '';
+  NAV[user.role].forEach(group => {
+    const label = document.createElement('div');
+    label.className = 'nav-group-label';
+    label.textContent = group.group;
+    nav.appendChild(label);
+    group.items.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'nav-item';
+      el.id = 'nav-'+item.id;
+      el.innerHTML = '<span class="glyph">▸</span><span>'+item.label+'</span><span class="nkey">'+item.key+'</span>';
+      el.onclick = () => navigate(item.id);
+      nav.appendChild(el);
+    });
+  });
+}
+
+function navigate(id) {
+  currentPage = id;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const navEl = document.getElementById('nav-'+id);
+  if (navEl) navEl.classList.add('active');
+  document.getElementById('pulse-title').textContent = TITLES[id] || id;
+  document.getElementById('content').innerHTML = PAGES[id] ? PAGES[id]() : '<p style="color:var(--ink-faint)">No access to this view.</p>';
+}
+
+function startClock() {
+  const tick = () => {
+    const el = document.getElementById('clock');
+    if (el) el.textContent = new Date().toLocaleTimeString('en-GB');
+  };
+  tick(); setInterval(tick, 1000);
+}
+
+function startMetrics() {
+  setInterval(() => {
+    const drift = v => Math.min(95, Math.max(8, v + (Math.random()-0.48)*5));
+    metrics.cpu = Math.round(drift(metrics.cpu));
+    metrics.mem = Math.round(drift(metrics.mem));
+    metrics.disk = Math.round(drift(metrics.disk));
+    metrics.net = Math.round(drift(metrics.net));
+    const set = (id,v) => { const e=document.getElementById(id); if(e) e.textContent = v+'%'; };
+    const fill = (id,v) => { const e=document.getElementById(id); if(e) e.style.width = v+'%'; };
+    document.getElementById('rb-cpu').textContent = metrics.cpu+'%';
+    document.getElementById('rb-mem').textContent = metrics.mem+'%';
+    set('ov-cpu', metrics.cpu); set('ov-mem', metrics.mem); set('ov-disk', metrics.disk); set('ov-net', metrics.net);
+    fill('ov-cpu-bar', metrics.cpu); fill('ov-mem-bar', metrics.mem); fill('ov-disk-bar', metrics.disk); fill('ov-net-bar', metrics.net);
+    set('tl-cpu', metrics.cpu); set('tl-mem', metrics.mem); set('tl-disk', metrics.disk); set('tl-net', metrics.net);
+    fill('tl-cpu-bar', metrics.cpu); fill('tl-mem-bar', metrics.mem); fill('tl-disk-bar', metrics.disk); fill('tl-net-bar', metrics.net);
+    const dashCpu = document.getElementById('big-cpu');
+    if (dashCpu) dashCpu.textContent = metrics.cpu+'%';
+  }, 1400);
+}
+
+/* Live pulse waveform in topbar */
+let pulseData = Array.from({length:120}, () => 20 + Math.random()*8);
+function startPulse() {
+  const svg = document.getElementById('pulse-svg');
+  function render() {
+    if (!document.getElementById('pulse-svg')) return;
+    const w = svg.clientWidth || 600;
+    const h = 24;
+    pulseData.shift();
+    const spike = Math.random() > 0.93 ? Math.random()*16 : 0;
+    pulseData.push(12 + Math.random()*4 + spike);
+    const step = w / (pulseData.length - 1);
+    let path = '';
+    pulseData.forEach((v,i) => {
+      const x = (i*step).toFixed(1);
+      const y = (h - v).toFixed(1);
+      path += (i===0 ? 'M' : 'L') + x + ',' + y + ' ';
+    });
+    svg.innerHTML = '<path d="'+path+'" fill="none" stroke="#FF8A3D" stroke-width="1" opacity="0.55"/>' +
+      '<circle cx="'+w+'" cy="'+(h-pulseData[pulseData.length-1]).toFixed(1)+'" r="2" fill="#FF8A3D"/>';
+    requestAnimationFrame(render);
+  }
+  render();
+}
+
+/* ============ PAGES ============ */
+const PAGES = {};
+
+PAGES.overview = () => `
+  <div class="page-head">
+    <div>
+      <div class="page-eyebrow">system status &mdash; ${new Date().toDateString()}</div>
+      <div class="page-title">All systems nominal</div>
+    </div>
+    <div class="page-meta">signed in as <span class="cell-mono cell-amber">${user.email}</span></div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-cell">
+      <div class="stat-label">CPU load</div>
+      <div class="stat-value amber" id="big-cpu">${metrics.cpu}%</div>
+      <div class="stat-foot">avg across fleet</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Active jobs</div>
+      <div class="stat-value signal">7</div>
+      <div class="stat-foot up">+2 since 09:00</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">EC2 instances</div>
+      <div class="stat-value">4</div>
+      <div class="stat-foot">3 running / 1 stopped</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Open alarms</div>
+      <div class="stat-value bad">2</div>
+      <div class="stat-foot down">cloudwatch</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Uptime (30d)</div>
+      <div class="stat-value good">99.94%</div>
+      <div class="stat-foot">sla target 99.9%</div>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">resource utilization <span class="dim">// 5 instances, live</span></div>
+        <div class="panel-action" onclick="navigate('telemetry')">expand →</div>
+      </div>
+      <div class="panel-body">
+        <div class="bar-row"><span class="bar-label">cpu</span><div class="bar-track"><div class="bar-fill" id="ov-cpu-bar" style="width:${metrics.cpu}%;background:var(--amber)"></div></div><span class="bar-val" id="ov-cpu">${metrics.cpu}%</span></div>
+        <div class="bar-row"><span class="bar-label">memory</span><div class="bar-track"><div class="bar-fill" id="ov-mem-bar" style="width:${metrics.mem}%;background:var(--signal)"></div></div><span class="bar-val" id="ov-mem">${metrics.mem}%</span></div>
+        <div class="bar-row"><span class="bar-label">disk i/o</span><div class="bar-track"><div class="bar-fill" id="ov-disk-bar" style="width:${metrics.disk}%;background:var(--warn)"></div></div><span class="bar-val" id="ov-disk">${metrics.disk}%</span></div>
+        <div class="bar-row"><span class="bar-label">network</span><div class="bar-track"><div class="bar-fill" id="ov-net-bar" style="width:${metrics.net}%;background:var(--good)"></div></div><span class="bar-val" id="ov-net">${metrics.net}%</span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">alarm queue <span class="dim">// cloudwatch + sns</span></div></div>
+      <div class="panel-body">
+        <div class="notice notice-warn"><div><b>MemoryUtilization</b> &gt; 65% on i-0a1b2c3d &mdash; triggered 10m ago, sns notified</div></div>
+        <div class="notice notice-bad"><div><b>ConnectionCount</b> 340/400 on ailab-db-prod &mdash; approaching limit</div></div>
+        <div class="notice notice-ok"><div><b>Backup complete</b> &mdash; ailab_ops → s3://ailab-backups/ at 02:00</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">recent ml jobs <span class="dim">// ecs fargate queue</span></div><div class="panel-action" onclick="navigate('jobs')">view all →</div></div>
+    <table class="console-table">
+      <thead><tr><th>job id</th><th>model</th><th>instance</th><th>owner</th><th>state</th><th>progress</th></tr></thead>
+      <tbody>
+        <tr><td class="cell-mono cell-amber">JOB-2841</td><td>BERT Fine-tune</td><td class="cell-mono">c5.xlarge</td><td class="cell-mono">researcher@ailab.io</td><td><span class="tag tag-run">running</span></td><td><div class="bar-track" style="width:110px;display:inline-block;vertical-align:middle"><div class="bar-fill" style="width:72%;background:var(--good)"></div></div></td></tr>
+        <tr><td class="cell-mono cell-amber">JOB-2840</td><td>ResNet-50 Train</td><td class="cell-mono">c5.2xlarge</td><td class="cell-mono">researcher@ailab.io</td><td><span class="tag tag-done">complete</span></td><td><div class="bar-track" style="width:110px;display:inline-block;vertical-align:middle"><div class="bar-fill" style="width:100%;background:var(--signal)"></div></div></td></tr>
+        <tr><td class="cell-mono cell-amber">JOB-2839</td><td>GPT-2 Inference</td><td class="cell-mono">t3.large</td><td class="cell-mono">admin@ailab.io</td><td><span class="tag tag-pend">queued</span></td><td><div class="bar-track" style="width:110px;display:inline-block;vertical-align:middle"><div class="bar-fill" style="width:0%"></div></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+`;
+
+PAGES.telemetry = () => `
+  <div class="page-head">
+    <div><div class="page-eyebrow">cloudwatch // live // updates every 1.4s</div><div class="page-title">Telemetry</div></div>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-cell"><div class="stat-label">cpu</div><div class="stat-value amber" id="tl-cpu">${metrics.cpu}%</div></div>
+    <div class="stat-cell"><div class="stat-label">memory</div><div class="stat-value signal" id="tl-mem">${metrics.mem}%</div></div>
+    <div class="stat-cell"><div class="stat-label">disk i/o</div><div class="stat-value" id="tl-disk">${metrics.disk}%</div></div>
+    <div class="stat-cell"><div class="stat-label">network</div><div class="stat-value good" id="tl-net">${metrics.net}%</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">resource bars <span class="dim">// fleet average</span></div></div>
+    <div class="panel-body">
+      <div class="bar-row"><span class="bar-label">cpu</span><div class="bar-track"><div class="bar-fill" id="tl-cpu-bar" style="width:${metrics.cpu}%;background:var(--amber)"></div></div><span class="bar-val" id="tl-cpu2">${metrics.cpu}%</span></div>
+      <div class="bar-row"><span class="bar-label">memory</span><div class="bar-track"><div class="bar-fill" id="tl-mem-bar" style="width:${metrics.mem}%;background:var(--signal)"></div></div><span class="bar-val" id="tl-mem2">${metrics.mem}%</span></div>
+      <div class="bar-row"><span class="bar-label">disk i/o</span><div class="bar-track"><div class="bar-fill" id="tl-disk-bar" style="width:${metrics.disk}%;background:var(--warn)"></div></div><span class="bar-val" id="tl-disk2">${metrics.disk}%</span></div>
+      <div class="bar-row"><span class="bar-label">network</span><div class="bar-track"><div class="bar-fill" id="tl-net-bar" style="width:${metrics.net}%;background:var(--good)"></div></div><span class="bar-val" id="tl-net2">${metrics.net}%</span></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">alarms <span class="dim">// 2 active</span></div></div>
+    <div class="panel-body">
+      <div class="notice notice-warn"><div><b>ALARM</b> &mdash; MemoryUtilization &gt; 65% on i-0a1b2c3d, 10m ago</div></div>
+      <div class="notice notice-bad"><div><b>ALARM</b> &mdash; RDS ConnectionCount &gt; 300, 4m ago</div></div>
+      <div class="notice notice-ok"><div><b>OK</b> &mdash; CPUUtilization back to normal, resolved 1h ago</div></div>
+    </div>
+  </div>
+`;
+
+PAGES.compute = () => `
+  <div class="page-head">
+    <div><div class="page-eyebrow">ec2 // ap-south-1 // vpc-0abc123def456</div><div class="page-title">Compute</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">instances</div></div>
+    <table class="console-table">
+      <thead><tr><th>instance</th><th>name</th><th>type</th><th>az</th><th>subnet</th><th>state</th></tr></thead>
+      <tbody>
+        <tr><td class="cell-mono cell-amber">i-0a1b2c3d</td><td>ailab-web-1</td><td class="cell-mono">t3.medium</td><td class="cell-mono">1a</td><td class="cell-mono">public-1a</td><td><span class="tag tag-run">running</span></td></tr>
+        <tr><td class="cell-mono cell-amber">i-0b2c3d4e</td><td>ailab-web-2</td><td class="cell-mono">t3.medium</td><td class="cell-mono">1b</td><td class="cell-mono">public-1b</td><td><span class="tag tag-run">running</span></td></tr>
+        <tr><td class="cell-mono cell-amber">i-0c3d4e5f</td><td>ailab-ml-worker</td><td class="cell-mono">c5.xlarge</td><td class="cell-mono">1a</td><td class="cell-mono">private-1a</td><td><span class="tag tag-run">running</span></td></tr>
+        <tr><td class="cell-mono cell-amber">i-0d4e5f6a</td><td>ailab-bastion</td><td class="cell-mono">t3.micro</td><td class="cell-mono">1a</td><td class="cell-mono">public-1a</td><td><span class="tag tag-stop">stopped</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">vpc topology</div></div>
+      <div class="panel-body">
+        <div class="bar-row" style="margin-bottom:9px"><span class="bar-label" style="width:130px">cidr block</span><span class="cell-mono">10.0.0.0/16</span></div>
+        <div class="bar-row" style="margin-bottom:9px"><span class="bar-label" style="width:130px">public subnets</span><span class="cell-mono">10.0.1.0/24, 10.0.2.0/24</span></div>
+        <div class="bar-row" style="margin-bottom:9px"><span class="bar-label" style="width:130px">private subnets</span><span class="cell-mono">10.0.3.0/24, 10.0.4.0/24</span></div>
+        <div class="bar-row" style="margin-bottom:0"><span class="bar-label" style="width:130px">nat gateway</span><span class="cell-mono cell-signal">active</span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">load balancer</div></div>
+      <div class="panel-body">
+        <div class="bar-row" style="margin-bottom:9px"><span class="bar-label" style="width:130px">type</span><span>application</span></div>
+        <div class="bar-row" style="margin-bottom:9px"><span class="bar-label" style="width:130px">listener</span><span class="cell-mono">443 → 80</span></div>
+        <div class="bar-row" style="margin-bottom:9px"><span class="bar-label" style="width:130px">tls</span><span class="cell-mono cell-signal">acm valid</span></div>
+        <div class="bar-row" style="margin-bottom:0"><span class="bar-label" style="width:130px">healthy targets</span><span class="cell-mono" style="color:var(--good)">3 / 3</span></div>
+      </div>
+    </div>
+  </div>
+`;
+
+PAGES.database = () => `
+  <div class="page-head">
+    <div><div class="page-eyebrow">rds // mysql 8.0 // private subnet</div><div class="page-title">Database</div></div>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-cell"><div class="stat-label">connections</div><div class="stat-value amber">340</div><div class="stat-foot">limit 400</div></div>
+    <div class="stat-cell"><div class="stat-label">query latency</div><div class="stat-value good">4ms</div><div class="stat-foot">avg 5min</div></div>
+    <div class="stat-cell"><div class="stat-label">storage</div><div class="stat-value">34GB</div><div class="stat-foot">of 100GB</div></div>
+    <div class="stat-cell"><div class="stat-label">last backup</div><div class="stat-value signal" style="font-size:18px">02:00</div><div class="stat-foot up">→ s3</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">ailab_ops <span class="dim">// schema</span></div></div>
+    <div class="panel-body">
+      <div class="schema-grid">
+        <div class="schema-table">
+          <div class="schema-name">ml_jobs</div>
+          <div class="schema-field"><span class="pk">id</span><span class="ftype">int pk</span></div>
+          <div class="schema-field"><span>job_name</span><span class="ftype">varchar(255)</span></div>
+          <div class="schema-field"><span>model_type</span><span class="ftype">varchar(100)</span></div>
+          <div class="schema-field"><span>instance_type</span><span class="ftype">varchar(50)</span></div>
+          <div class="schema-field"><span>submitted_by</span><span class="ftype">varchar(100)</span></div>
+          <div class="schema-field"><span>status</span><span class="ftype">varchar(50)</span></div>
+        </div>
+        <div class="schema-table">
+          <div class="schema-name">operational_records</div>
+          <div class="schema-field"><span class="pk">id</span><span class="ftype">int pk</span></div>
+          <div class="schema-field"><span>title</span><span class="ftype">varchar(255)</span></div>
+          <div class="schema-field"><span>status</span><span class="ftype">varchar(50)</span></div>
+          <div class="schema-field"><span>created_by</span><span class="ftype">varchar(100)</span></div>
+          <div class="schema-field"><span>created_at</span><span class="ftype">timestamp</span></div>
+        </div>
+        <div class="schema-table">
+          <div class="schema-name">users</div>
+          <div class="schema-field"><span class="pk">id</span><span class="ftype">int pk</span></div>
+          <div class="schema-field"><span>email</span><span class="ftype">varchar(255)</span></div>
+          <div class="schema-field"><span>role</span><span class="ftype">varchar(50)</span></div>
+          <div class="schema-field"><span>created_at</span><span class="ftype">timestamp</span></div>
+        </div>
+        <div class="schema-table">
+          <div class="schema-name">audit_logs</div>
+          <div class="schema-field"><span class="pk">id</span><span class="ftype">int pk</span></div>
+          <div class="schema-field"><span>user_id</span><span class="ftype">varchar(100)</span></div>
+          <div class="schema-field"><span>action</span><span class="ftype">varchar(255)</span></div>
+          <div class="schema-field"><span>table_name</span><span class="ftype">varchar(100)</span></div>
+          <div class="schema-field"><span>timestamp</span><span class="ftype">timestamp</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">ml_jobs <span class="dim">// SELECT * FROM ml_jobs;</span></div></div>
+    <table class="console-table">
+      <thead><tr><th>id</th><th>job_name</th><th>model_type</th><th>instance_type</th><th>submitted_by</th><th>status</th></tr></thead>
+      <tbody>
+        <tr><td class="cell-mono">1</td><td>BERT Fine-tune</td><td class="cell-mono">NLP</td><td class="cell-mono">c5.xlarge</td><td class="cell-mono">researcher@ailab.io</td><td><span class="tag tag-run">running</span></td></tr>
+        <tr><td class="cell-mono">2</td><td>ResNet-50 Train</td><td class="cell-mono">Computer Vision</td><td class="cell-mono">c5.2xlarge</td><td class="cell-mono">researcher@ailab.io</td><td><span class="tag tag-done">complete</span></td></tr>
+        <tr><td class="cell-mono">3</td><td>GPT-2 Inference</td><td class="cell-mono">NLP</td><td class="cell-mono">t3.large</td><td class="cell-mono">admin@ailab.io</td><td><span class="tag tag-pend">queued</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+`;
+
+PAGES.containers = () => `
+  <div class="page-head">
+    <div><div class="page-eyebrow">ecs fargate // ecr</div><div class="page-title">Containers</div></div>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-cell"><div class="stat-label">running tasks</div><div class="stat-value good">6</div></div>
+    <div class="stat-cell"><div class="stat-label">ecr images</div><div class="stat-value">4</div></div>
+    <div class="stat-cell"><div class="stat-label">cpu reserved</div><div class="stat-value amber">3.0 vcpu</div></div>
+    <div class="stat-cell"><div class="stat-label">memory reserved</div><div class="stat-value signal">6 gb</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">ailab-cluster <span class="dim">// fargate</span></div></div>
+    <table class="console-table">
+      <thead><tr><th>service</th><th>image</th><th>tasks</th><th>cpu</th><th>memory</th><th>status</th></tr></thead>
+      <tbody>
+        <tr><td>ailab-web</td><td class="cell-mono">ailab-app:v2.3.1</td><td class="cell-mono">2/2</td><td class="cell-mono">0.5</td><td class="cell-mono">1gb</td><td><span class="tag tag-run">healthy</span></td></tr>
+        <tr><td>ailab-api</td><td class="cell-mono">ailab-api:v1.8.0</td><td class="cell-mono">2/2</td><td class="cell-mono">0.5</td><td class="cell-mono">1gb</td><td><span class="tag tag-run">healthy</span></td></tr>
+        <tr><td>ml-worker</td><td class="cell-mono">ailab-worker:v1.2.0</td><td class="cell-mono">2/4</td><td class="cell-mono">2.0</td><td class="cell-mono">4gb</td><td><span class="tag tag-pend">scaling</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">dockerfile <span class="dim">// ailab-app</span></div></div>
+    <div class="panel-body">
+<div class="codeblock"><span class="cm"># AILab production image</span>
+<span class="kw">FROM</span> python:3.11-slim
+<span class="kw">WORKDIR</span> /app
+<span class="kw">COPY</span> requirements.txt .
+<span class="kw">RUN</span> pip install --no-cache-dir -r requirements.txt
+<span class="kw">COPY</span> . .
+<span class="kw">RUN</span> useradd -m ailab
+<span class="kw">USER</span> ailab
+<span class="kw">EXPOSE</span> <span class="str">8000</span>
+<span class="kw">CMD</span> [<span class="str">"gunicorn"</span>, <span class="str">"app:app"</span>, <span class="str">"--bind"</span>, <span class="str">"0.0.0.0:8000"</span>]</div>
+    </div>
+  </div>
+`;
+
+PAGES.access = () => `
+  <div class="page-head">
+    <div><div class="page-eyebrow">iam // cognito // waf</div><div class="page-title">Access control</div></div>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-cell"><div class="stat-label">waf blocks (24h)</div><div class="stat-value good">1,204</div></div>
+    <div class="stat-cell"><div class="stat-label">iam users</div><div class="stat-value">47</div></div>
+    <div class="stat-cell"><div class="stat-label">mfa coverage</div><div class="stat-value good">100%</div></div>
+    <div class="stat-cell"><div class="stat-label">failed logins</div><div class="stat-value bad">3</div></div>
+  </div>
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">iam groups</div></div>
+      <table class="console-table">
+        <thead><tr><th>group</th><th>users</th><th>scope</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag tag-done">admins</span></td><td class="cell-mono">5</td><td>full access</td></tr>
+          <tr><td><span class="tag tag-pend">managers</span></td><td class="cell-mono">12</td><td>read + reports</td></tr>
+          <tr><td><span class="tag tag-run">researchers</span></td><td class="cell-mono">30</td><td>ec2, s3, sagemaker</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">security groups</div></div>
+      <table class="console-table">
+        <thead><tr><th>name</th><th>inbound</th></tr></thead>
+        <tbody>
+          <tr><td>Web-SG</td><td class="cell-mono">80, 443 ← 0.0.0.0/0</td></tr>
+          <tr><td>DB-SG</td><td class="cell-mono">3306 ← Web-SG</td></tr>
+          <tr><td>Admin-SG</td><td class="cell-mono">22 ← my-ip</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">waf <span class="dim">// recent blocks</span></div></div>
+    <table class="console-table">
+      <thead><tr><th>time</th><th>source ip</th><th>type</th><th>rule</th><th>action</th></tr></thead>
+      <tbody>
+        <tr><td class="cell-mono">11:34:02</td><td class="cell-mono">185.22.x.x</td><td>sql injection</td><td class="cell-mono">AWSManagedRulesSQLi</td><td><span class="tag tag-stop">blocked</span></td></tr>
+        <tr><td class="cell-mono">11:29:17</td><td class="cell-mono">103.44.x.x</td><td>xss</td><td class="cell-mono">AWSManagedRulesXSS</td><td><span class="tag tag-stop">blocked</span></td></tr>
+        <tr><td class="cell-mono">11:14:55</td><td class="cell-mono">45.33.x.x</td><td>rate abuse</td><td class="cell-mono">RateLimit-1000rpm</td><td><span class="tag tag-stop">blocked</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+`;
+
+PAGES.audit = () => {
+  const logs = [
+    {t:'11:37:02',l:'INFO',m:'User <span class="hl">admin@ailab.io</span> authenticated via Cognito from 103.x.x.x'},
+    {t:'11:36:55',l:'WARN',m:'RDS ailab-db-prod connection count reached <span class="hl">340/400</span>'},
+    {t:'11:35:41',l:'INFO',m:'ECS task ml-worker:v1.2.0 started — <span class="hl">JOB-2841</span> assigned'},
+    {t:'11:34:02',l:'WARN',m:'WAF blocked SQL injection from 185.22.x.x → <span class="hl">AWSManagedRulesSQLi</span>'},
+    {t:'11:30:00',l:'INFO',m:'Backup: mysqldump ailab_ops → <span class="hl">s3://ailab-backups/2024-06-09.sql.gz</span> (14.3GB)'},
+    {t:'11:28:33',l:'INFO',m:'ASG ailab-web-asg launched <span class="hl">i-0new12345</span> in ap-south-1b'},
+    {t:'11:20:11',l:'ERR', m:'EC2 i-0c3d4e5f disk at <span class="hl">89%</span> — alarm triggered'},
+    {t:'11:15:00',l:'INFO',m:'CloudTrail: IAM policy ResearcherPolicy updated by <span class="hl">admin@ailab.io</span>'},
+    {t:'11:10:44',l:'INFO',m:'ECS ailab-web deployment complete — <span class="hl">2/2 healthy</span>'},
+    {t:'11:05:22',l:'INFO',m:'Route53 health check: ailab-alb → <span class="hl">HEALTHY</span>'},
+    {t:'11:02:01',l:'WARN',m:'Lambda generate_weekly_report: <span class="hl">4.2s</span> (limit 5s)'},
+    {t:'10:58:33',l:'INFO',m:'S3 CRR: <span class="hl">14 objects</span> replicated to us-east-1'},
+  ];
+  return `
+  <div class="page-head">
+    <div><div class="page-eyebrow">cloudtrail // 90 day retention // s3 encrypted</div><div class="page-title">Audit trail</div></div>
+    <button class="btn-console btn-ghost">export →</button>
+  </div>
+  <div class="panel">
+    <div class="panel-body">
+      ${logs.map(l => `<div class="logline"><span class="logtime">${l.t}</span><span class="loglvl loglvl-${l.l}">${l.l}</span><span class="logmsg">${l.m}</span></div>`).join('')}
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">audit_logs <span class="dim">// SELECT * FROM audit_logs;</span></div></div>
+    <table class="console-table">
+      <thead><tr><th>id</th><th>user_id</th><th>action</th><th>table_name</th></tr></thead>
+      <tbody>
+        <tr><td class="cell-mono">1</td><td class="cell-mono">admin@ailab.io</td><td class="cell-mono cell-amber">CREATE_TABLE</td><td class="cell-mono">ml_jobs</td></tr>
+        <tr><td class="cell-mono">2</td><td class="cell-mono">admin@ailab.io</td><td class="cell-mono cell-signal">INSERT</td><td class="cell-mono">ml_jobs</td></tr>
+        <tr><td class="cell-mono">3</td><td class="cell-mono">researcher@ailab.io</td><td class="cell-mono" style="color:var(--warn)">UPDATE</td><td class="cell-mono">operational_records</td></tr>
+        <tr><td class="cell-mono">4</td><td class="cell-mono">admin@ailab.io</td><td class="cell-mono" style="color:var(--good)">SELECT</td><td class="cell-mono">users</td></tr>
+      </tbody>
+    </table>
+  </div>
+  `;
+};
+
+let jobCounter = 2842;
+PAGES.jobs = () => {
+  const canSubmit = user.role !== 'manager';
+  return `
+  <div class="page-head">
+    <div><div class="page-eyebrow">ecs fargate queue // sns notify on complete</div><div class="page-title">ML jobs</div></div>
+    ${canSubmit ? '<button class="btn-console btn-amber" onclick="openJobForm()">+ submit job</button>' : ''}
+  </div>
+  <div id="job-notice"></div>
+  <div id="job-form"></div>
+  <div class="panel">
+    <table class="console-table">
+      <thead><tr><th>job id</th><th>model</th><th>instance</th><th>submitted by</th><th>state</th><th>progress</th></tr></thead>
+      <tbody id="jobs-tbody">
+        <tr><td class="cell-mono cell-amber">JOB-2841</td><td>BERT Fine-tune</td><td class="cell-mono">c5.xlarge</td><td class="cell-mono">researcher@ailab.io</td><td><span class="tag tag-run">running</span></td><td><div class="bar-track" style="width:110px;display:inline-block"><div class="bar-fill" style="width:72%;background:var(--good)"></div></div></td></tr>
+        <tr><td class="cell-mono cell-amber">JOB-2840</td><td>ResNet-50</td><td class="cell-mono">c5.2xlarge</td><td class="cell-mono">researcher@ailab.io</td><td><span class="tag tag-done">complete</span></td><td><div class="bar-track" style="width:110px;display:inline-block"><div class="bar-fill" style="width:100%;background:var(--signal)"></div></div></td></tr>
+        <tr><td class="cell-mono cell-amber">JOB-2839</td><td>GPT-2 Inference</td><td class="cell-mono">t3.large</td><td class="cell-mono">admin@ailab.io</td><td><span class="tag tag-pend">queued</span></td><td><div class="bar-track" style="width:110px;display:inline-block"><div class="bar-fill" style="width:0%"></div></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+  `;
+};
+
+function openJobForm() {
+  document.getElementById('job-form').innerHTML = `
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">new job <span class="dim">// ecs fargate</span></div></div>
+    <div class="panel-body">
+      <div class="form-row">
+        <div class="field" style="margin:0"><label class="field-label">model name</label><input id="jname" placeholder="e.g. BERT Fine-tune v3"></div>
+        <div class="field" style="margin:0"><label class="field-label">instance type</label>
+          <select id="jtype">
+            <option>c5.xlarge</option><option>c5.2xlarge</option><option>t3.large</option><option>g4dn.xlarge</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn-console btn-amber" onclick="submitJob()">submit →</button>
+      <button class="btn-console btn-ghost" onclick="document.getElementById('job-form').innerHTML=''">cancel</button>
+    </div>
+  </div>`;
+}
+
+function submitJob() {
+  const name = document.getElementById('jname').value || 'Custom model';
+  const type = document.getElementById('jtype').value;
+  const id = 'JOB-'+(jobCounter++);
+  const tbody = document.getElementById('jobs-tbody');
+  const row = document.createElement('tr');
+  row.innerHTML = `<td class="cell-mono cell-amber">${id}</td><td>${name}</td><td class="cell-mono">${type}</td><td class="cell-mono">${user.email}</td><td><span class="tag tag-pend">queued</span></td><td><div class="bar-track" style="width:110px;display:inline-block"><div class="bar-fill" style="width:0%"></div></div></td>`;
+  tbody.insertBefore(row, tbody.firstChild);
+  document.getElementById('job-form').innerHTML = '';
+  document.getElementById('job-notice').innerHTML = `<div class="notice notice-ok"><div><b>${id}</b> queued on ECS Fargate. SNS will notify ${user.email} on completion.</div></div>`;
+  setTimeout(() => { const n = document.getElementById('job-notice'); if(n) n.innerHTML=''; }, 5000);
+}
+
+PAGES.reports = () => `
+  <div class="page-head">
+    <div><div class="page-eyebrow">lambda // eventbridge // ses</div><div class="page-title">Reports</div></div>
+    <button class="btn-console btn-ghost">generate now</button>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-cell"><div class="stat-label">jobs this week</div><div class="stat-value amber">42</div><div class="stat-foot up">+18%</div></div>
+    <div class="stat-cell"><div class="stat-label">avg duration</div><div class="stat-value">2.4h</div></div>
+    <div class="stat-cell"><div class="stat-label">monthly cost</div><div class="stat-value signal">$135.23</div></div>
+    <div class="stat-cell"><div class="stat-label">sla uptime</div><div class="stat-value good">99.9%</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">scheduled reports</div></div>
+    <table class="console-table">
+      <thead><tr><th>report</th><th>trigger</th><th>recipients</th><th>last sent</th><th>status</th></tr></thead>
+      <tbody>
+        <tr><td>weekly ops summary</td><td class="cell-mono">cron(0 8 ? * MON *)</td><td>3 managers</td><td class="cell-mono">Jun 9 08:00</td><td><span class="tag tag-run">active</span></td></tr>
+        <tr><td>cost report</td><td class="cell-mono">cron(0 8 1 * ? *)</td><td>admin</td><td class="cell-mono">Jun 1 08:00</td><td><span class="tag tag-run">active</span></td></tr>
+        <tr><td>security audit</td><td class="cell-mono">cron(0 18 ? * FRI *)</td><td>5 admins</td><td class="cell-mono">Jun 7 18:00</td><td><span class="tag tag-run">active</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+`;
+
+PAGES.cost = () => `
+  <div class="page-head">
+    <div><div class="page-eyebrow">aws pricing calculator // ap-south-1</div><div class="page-title">Cost</div></div>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-cell"><div class="stat-label">monthly (on-demand)</div><div class="stat-value bad">$135.23</div></div>
+    <div class="stat-cell"><div class="stat-label">monthly (reserved 1yr)</div><div class="stat-value good">$85.20</div><div class="stat-foot up">-37%</div></div>
+    <div class="stat-cell"><div class="stat-label">annual (on-demand)</div><div class="stat-value">$1,622.76</div></div>
+    <div class="stat-cell"><div class="stat-label">annual (reserved)</div><div class="stat-value signal">$1,022.40</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">cost by service</div></div>
+    <table class="console-table">
+      <thead><tr><th>service</th><th>config</th><th>monthly</th></tr></thead>
+      <tbody>
+        <tr><td>RDS MySQL</td><td class="cell-mono">db.t3.micro, multi-az, 20gb</td><td class="cell-mono cell-amber">$84.08</td></tr>
+        <tr><td>Elastic Load Balancing</td><td class="cell-mono">1 application alb</td><td class="cell-mono cell-amber">$29.13</td></tr>
+        <tr><td>EC2</td><td class="cell-mono">2 × t3.medium</td><td class="cell-mono cell-amber">$16.52</td></tr>
+        <tr><td>CloudWatch</td><td class="cell-mono">10 metrics</td><td class="cell-mono cell-amber">$3.00</td></tr>
+        <tr><td>S3</td><td class="cell-mono">100gb standard</td><td class="cell-mono cell-amber">$2.50</td></tr>
+        <tr style="font-weight:600"><td>total</td><td></td><td class="cell-mono" style="color:var(--amber)">$135.23</td></tr>
+      </tbody>
+    </table>
+  </div>
+`;
+</script>
+</body>
+</html>
